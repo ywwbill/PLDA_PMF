@@ -139,7 +139,7 @@ class Mat{
 			}
 		private:
 			double* _array;
-    };
+	};
 	
 	Proxy & operator[](int i){
 		if (i>=n || i<0) {
