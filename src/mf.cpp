@@ -234,7 +234,7 @@ void load_data(string data_file, vector<Triplet> &data_vec, int &num_d, int &num
 			int word_id;
 			double cnt;
 			fscanf(pFile, "%d:%lf", &word_id, &cnt);
-			word_id--;
+			//word_id--;
 			if (word_id + 1 > num_w) num_w = word_id + 1;
 			data_vec.push_back(Triplet(doc_id, word_id, cnt));
 		}
