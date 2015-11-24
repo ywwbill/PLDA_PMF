@@ -322,7 +322,7 @@ int main(int argc, char **argv){
 	if (!ParseMainArgs(argc, argv, train_file, probe_file)) return 0;
 	
 	
-	double epsilon = 50.0; // Learning rate 
+	double epsilon = 0.5; // Learning rate
 	double lambda = 0.01; // Regularization parameter 
 	double momentum = 0.8;
 	
@@ -330,9 +330,9 @@ int main(int argc, char **argv){
 	int epoch = 0;
 	int maxepoch = 50;
 	
-	int num_d = 1;  // Number of docs 
-	int num_w = 2;  // Number of words 
-	int num_feat = 1; // Rank 10 decomposition 
+	int num_d = 2020;  // Number of docs
+	int num_w = 7167;  // Number of words
+	int num_feat = 10; // Rank 10 decomposition
 	int tmp_num_d, tmp_num_w;
 	
 	load_data(train_file, train_vec, num_d, num_w); // Triplets: {doc_id, word_id, cnt} 
