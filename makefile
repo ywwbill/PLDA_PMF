@@ -1,4 +1,4 @@
-all: bin/CorpusConvertor.exe bin/LDATrainSeq.exe bin/LDATestSeq.exe
+all: bin/CorpusConvertor.exe bin/LDATrainSeq.exe bin/LDATestSeq.exe bin/ResultComparer.exe
 
 bin/CorpusConvertor.exe: obj/CorpusConvertor.o
 	g++ obj/CorpusConvertor.o -o bin/CorpusConvertor.exe
@@ -17,3 +17,9 @@ bin/LDATestSeq.exe: obj/LDATestSeq.o
 
 obj/LDATestSeq.o: src/LDATestSeq.cpp
 	g++ -O0 -g3 -Wall -c src/LDATestSeq.cpp -o obj/LDATestSeq.o
+	
+bin/ResultComparer.exe: obj/ResultComparer.o
+	g++ obj/ResultComparer.o -o bin/ResultComparer.exe
+
+obj/ResultComparer.o: src/ResultComparer.cpp
+	g++ -O0 -g3 -Wall -c src/ResultComparer.cpp -o obj/ResultComparer.o

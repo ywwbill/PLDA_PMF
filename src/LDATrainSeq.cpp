@@ -210,40 +210,40 @@ int main()
 	}
 
 	//write model
-	ofstream modelFout(modelFileName);
-	modelFout << numTopics << " " << numVocab << endl;
-	for (int topic=0; topic<numTopics; topic++)
-	{
-		for (int vocab=0; vocab<numVocab; vocab++)
-		{
-			modelFout << phi[topic][vocab] << " ";
-		}
-		modelFout << endl;
-	}
-	modelFout.close();
+//	ofstream modelFout(modelFileName);
+//	modelFout << numTopics << " " << numVocab << endl;
+//	for (int topic=0; topic<numTopics; topic++)
+//	{
+//		for (int vocab=0; vocab<numVocab; vocab++)
+//		{
+//			modelFout << phi[topic][vocab] << " ";
+//		}
+//		modelFout << endl;
+//	}
+//	modelFout.close();
 
 	//write result
-	ofstream resultFout(resultFileName);
-	vector<LDAWord> words;
-	for (int topic=0; topic<numTopics; topic++)
-	{
-		resultFout << "Topic " << topic << ":";
-		words.clear();
-		for (int vocab=0; vocab<numVocab; vocab++)
-		{
-			LDAWord w;
-			w.word=vocabulary[vocab];
-			w.count=topicVocabCounts[topic][vocab];
-			words.push_back(w);
-		}
-		sort(words.begin(), words.end(), compare);
-		for (int i=0; i<numTopWords; i++)
-		{
-			resultFout << "   " << words[i].word << ":" << words[i].count;
-		}
-		resultFout << endl;
-	}
-	resultFout.close();
+//	ofstream resultFout(resultFileName);
+//	vector<LDAWord> words;
+//	for (int topic=0; topic<numTopics; topic++)
+//	{
+//		resultFout << "Topic " << topic << ":";
+//		words.clear();
+//		for (int vocab=0; vocab<numVocab; vocab++)
+//		{
+//			LDAWord w;
+//			w.word=vocabulary[vocab];
+//			w.count=topicVocabCounts[topic][vocab];
+//			words.push_back(w);
+//		}
+//		sort(words.begin(), words.end(), compare);
+//		for (int i=0; i<numTopWords; i++)
+//		{
+//			resultFout << "   " << words[i].word << ":" << words[i].count;
+//		}
+//		resultFout << endl;
+//	}
+//	resultFout.close();
 
 	return 0;
 }
