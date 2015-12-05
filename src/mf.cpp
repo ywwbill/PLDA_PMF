@@ -5,14 +5,18 @@ F = acc_error + doc_reg + word_reg
 
 The program should take two data files i.e. training data and testing data.
 The input data is in the format of 
-n1 w_a(1,1):cnt_a(1,1) w_a(1,2):cnt_a(1,2) ... w_a(1,n1):cnt_a(1,n1)
-n2 w_a(2,1):cnt_a(2,1) w_a(2,2):cnt_a(2,2) ... w_a(2,n2):cnt_a(2,n2)
+total_word_in_doc1 w_a(1,1):cnt_a(1,1) w_a(1,2):cnt_a(1,2) ... w_a(1,n1):cnt_a(1,n1)
+total_word_in_doc2 w_a(2,1):cnt_a(2,1) w_a(2,2):cnt_a(2,2) ... w_a(2,n2):cnt_a(2,n2)
 ...
-nm w_a(m,1):cnt_a(m,1) w_a(m,2):cnt_a(m,2) ... w_a(m,nm):cnt_a(m,nm)
+total_word_in_docm w_a(m,1):cnt_a(m,1) w_a(m,2):cnt_a(m,2) ... w_a(m,nm):cnt_a(m,nm)
 
+where total_word_in_dock = \sum_i cnt_a(k,i)
 
 The program will print to the screen the training loss and accuracy on testing data in each epoch and batch. 
 
+Usage:
+g++ mf.cpp -o mf
+./mf data/train_corpus.txt data/test_corpus.txt
 
 Author: Xi Yi (yixi1992@gmail.com)
 Date: 11/05/2015
@@ -225,22 +229,26 @@ vector<double> err_train, err_valid;
 	data_file: input file name
 	data_vec: vector of Triplets read from the input file
 */
-void load_data(string data_file, vector<Triplet> &data_vec, int &num_d, int &num_w){
+void load_data(string data_file, vector<Triplet> &data_vec, int &num_d, int &num_w, int &cur_doc_id){
+
 	FILE *pFile;
 	pFile = fopen(data_file.c_str(), "r");
-	int doc_id = 0, n;
+	int n, doc_id=cur_doc_id;
+	fscanf(pFile, "%d", &n);
 	while (fscanf(pFile, "%d", &n)>0){
-		for (int i=0; i<n; i++){
-			int word_id;
-			double cnt;
-			fscanf(pFile, "%d:%lf", &word_id, &cnt);
-			//word_id--;
-			if (word_id + 1 > num_w) num_w = word_id + 1;
+		printf("doc_id=%d n=%d\n",doc_id,n);
+		while (n>0){	
+			int word_id, cnt;
+			fscanf(pFile, "%d:%d", &word_id, &cnt);
 			data_vec.push_back(Triplet(doc_id, word_id, cnt));
+			
+			num_w = max(num_w, word_id + 1);
+			n-=cnt;
 		}
 		doc_id ++;
 	}
-	num_d = doc_id;
+	num_d = doc_id - cur_doc_id;
+	cur_doc_id = doc_id;
 	fclose(pFile);
 }
 
@@ -304,7 +312,7 @@ double CalcObj(const Mat &D, const Mat &W, const vector<Triplet> &train_vec, con
 */
 bool ParseMainArgs(int argc, char **argv, string &train_file, string &probe_file){
 	if (argc<3){
-		printf("Please provide train and probe file name e.g. mf train.txt probe\n");
+		printf("Please provide train and probe file name e.g. mf train.txt probe.txt\n");
 		return false;
 	}
 	train_file = string(argv[1]);
@@ -333,17 +341,27 @@ int main(int argc, char **argv){
 	int num_d = 2020;  // Number of docs
 	int num_w = 7167;  // Number of words
 	int num_feat = 10; // Rank 10 decomposition
-	int tmp_num_d, tmp_num_w;
+	int tmp_num_d;
+	int cur_doc_id = 0;
 	
-	load_data(train_file, train_vec, num_d, num_w); // Triplets: {doc_id, word_id, cnt} 
-	load_data(probe_file, probe_vec, tmp_num_d, tmp_num_w);
+	vector<Triplet> all_data_vec;
+	load_data(train_file, all_data_vec, tmp_num_d, num_w, cur_doc_id); // Triplets: {doc_id, word_id, cnt} 
+	load_data(probe_file, all_data_vec, tmp_num_d, num_w, cur_doc_id);
+	num_d = cur_doc_id;
+	printf("num_d=%d\n",num_d);
+	
+	for (int i=0; i<all_data_vec.size(); i++){
+		if (rand()%100<90) train_vec.push_back(all_data_vec[i]);
+		else probe_vec.push_back(all_data_vec[i]);
+	}
+	all_data_vec.clear();
 	
 	int pairs_tr = train_vec.size(); // training data
 	int pairs_pr = probe_vec.size(); // validation data
 	
 	double mean_cnt = sum_cnt(train_vec)/pairs_tr;
 	
-	int numbatches = 1; // Number of batches  
+	int numbatches = 10; // Number of batches  
 	int N = (pairs_tr-1)/numbatches+1; // number training triplets per batch 
 	
 	Mat D = Mat(num_d, num_feat); // Doc feature vectors
@@ -361,6 +379,7 @@ int main(int argc, char **argv){
 		for (int batch = 1; batch <= numbatches; batch++ ){
 		
 			int begin_idx = (batch-1)*N, end_idx = min(batch*N-1, pairs_tr-1), N = end_idx - begin_idx +1;
+			printf("epoch %4i batch %4i begin_idx %4i end_idx %4i\n", epoch, batch, begin_idx, end_idx);
 
 			//%%%%%%%%%%%%%% Compute Predictions %%%%%%%%%%%%%%%%%
 			F = CalcObj(D, W, train_vec, begin_idx, end_idx, lambda, mean_cnt, error, pred_out);
@@ -403,7 +422,7 @@ int main(int argc, char **argv){
 			//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			//%%% Compute predictions on the validation set %%%%%%%%%%%%%%%%%%%%%% 
 			F = CalcObj(D, W, probe_vec, 0, pairs_pr-1, lambda, mean_cnt, error, pred_out);
-			err_valid.push_back(sqrt(error.Sqr().Sum())/pairs_pr);
+			err_valid.push_back(sqrt(error.Sqr().Sum()/pairs_pr));
 			printf("epoch %4i batch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, batch, err_train[epoch], err_valid[epoch]);
 		}
 		//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
