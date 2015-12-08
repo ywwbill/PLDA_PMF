@@ -105,13 +105,16 @@ namespace pmf {
             W_inc = NewArray(model.num_w, model.num_feat, 0);
             d_D = NewArray(model.num_d, model.num_feat, 0);
             d_W = NewArray(model.num_w, model.num_feat, 0);
+            mean_cnt = sum_cnt(train_vec) / pairs_tr;
         };
 
         void run();
 
-        void validate();
-
         void sync();
+
+        void get_train_loss();
+
+        void get_probe_loss();
 
     protected:
         int epoch;
@@ -119,6 +122,7 @@ namespace pmf {
         size_t pairs_pr;
         std::vector<std::vector<double> > D_inc, W_inc;
         std::vector<std::vector<double> > d_D, d_W;
+        double mean_cnt;
 
         void _sync(std::vector<std::vector<double> > vec, int num_row, int num_col);
     };
@@ -127,7 +131,8 @@ namespace pmf {
     class Solver {
     public:
         Solver(Scheduler &scheduler, Block &block, pmf_model &model) : scheduler(scheduler), block(block), model(model) {
-
+            pairs_tr = train_vec.size();
+            mean_cnt = sum_cnt(train_vec) / pairs_tr;
         }
 
         void run(std::vector<std::vector<double> > &d_D, std::vector<std::vector<double> > &d_W);
@@ -141,6 +146,8 @@ namespace pmf {
         Block &block;
         int maxepoch;
         pmf_model &model;
+        double mean_cnt;
+        int pairs_tr;
     };
 }
 

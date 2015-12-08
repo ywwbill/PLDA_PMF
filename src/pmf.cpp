@@ -12,8 +12,6 @@
 #include <mpi.h>
 #include <stddef.h>
 
-#include <boost/serialization/vector.hpp> // To serilize D and W
-
 #include "pmf.h"
 #include "mf.h"
 
@@ -27,17 +25,11 @@ MPI_Datatype MPI_Triplet;
 
 // Solver
 void pmf::Solver::run(vector<vector<double> > &d_D, vector<vector<double> > &d_W) {
-    int pairs_tr = train_vec.size();
-    double mean_cnt = sum_cnt(train_vec) / pairs_tr;
+    int NN = (pairs_tr - 1) / mpi_size + 1; // number training triplets per batch
 
-    int num_batches = 10; // Number of batches
-    int NN = (pairs_tr - 1) / num_batches + 1; // number training triplets per batch
-
-    vector<vector<double> > D_inc = NewArray(model.num_d, model.num_feat, 0), W_inc = NewArray(model.num_w, model.num_feat, 0);
     vector<vector<double> > error = NewArray(NN, 1, 0), pred_out = NewArray(NN, 1, 0);
 
-    vector<vector<double> > Ix_D = NewArray(NN, model.num_feat, 0), Ix_W = NewArray(NN, model.num_feat,
-                                                                                    0); // gradient w.r.t. training sample
+    vector<vector<double> > Ix_D = NewArray(NN, model.num_feat, 0), Ix_W = NewArray(NN, model.num_feat, 0); // gradient w.r.t. training sample
 
     double F = 0.0;
 
@@ -45,58 +37,37 @@ void pmf::Solver::run(vector<vector<double> > &d_D, vector<vector<double> > &d_W
         // Random permute training data.
         std::random_shuffle(train_vec.begin(), train_vec.end());
 
-        for (int batch = 1; batch <= num_batches; batch++) {
+        int begin_idx = (my_rank - 1) * NN, end_idx = min(my_rank * NN - 1, pairs_tr - 1), N = end_idx - begin_idx + 1;
 
-            int begin_idx = (batch - 1) * NN, end_idx = min(batch * NN - 1, pairs_tr - 1), N =
-                    end_idx - begin_idx + 1;
+        //%%%%%%%%%%%%%% Compute Predictions %%%%%%%%%%%%%%%%%
+        F = CalcObj(model.D, model.W, train_vec, begin_idx, end_idx, model.lambda, mean_cnt, error, pred_out);
 
-            //%%%%%%%%%%%%%% Compute Predictions %%%%%%%%%%%%%%%%%
-            F = CalcObj(model.D, model.W, train_vec, begin_idx, end_idx, model.lambda, mean_cnt, error,
-                        pred_out);
-
-            //%%%%%%%%%%%%%% Compute Gradients %%%%%%%%%%%%%%%%%%%
-            for (int i = begin_idx; i <= end_idx; i++) {
-                int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
-                for (int j = 0; j < model.num_feat; j++) {
-                    double dd = model.D[doc_id][j], ww = model.W[word_id][j];
-                    Ix_D[i - begin_idx][j] = error[i - begin_idx][0] * 2 * ww + model.lambda * dd;
-                    Ix_W[i - begin_idx][j] = error[i - begin_idx][0] * 2 * dd + model.lambda * ww;
-                }
+        //%%%%%%%%%%%%%% Compute Gradients %%%%%%%%%%%%%%%%%%%
+        for (int i = begin_idx; i <= end_idx; i++) {
+            int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
+            for (int j = 0; j < model.num_feat; j++) {
+                double dd = model.D[doc_id][j], ww = model.W[word_id][j];
+                Ix_D[i - begin_idx][j] = error[i - begin_idx][0] * 2 * ww + model.lambda * dd;
+                Ix_W[i - begin_idx][j] = error[i - begin_idx][0] * 2 * dd + model.lambda * ww;
             }
-
-            reset(d_D);
-            reset(d_W);
-            for (int i = begin_idx; i <= end_idx; i++) {
-                int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
-                for (int j = 0; j < model.num_feat; j++) {
-                    d_D[doc_id][j] += Ix_D[i - begin_idx][j];
-                    d_W[word_id][j] += Ix_W[i - begin_idx][j];
-                }
-            }
-
-            //%%%% Update doc and word features %%%%%%%%%%%
-
-            Scale(D_inc, D_inc, model.momentum);
-            Scale(d_D, d_D, model.epsilon / N);
-            Add(D_inc, D_inc, d_D);
-            //D_inc = D_inc*momentum + d_D*(epsilon/N);
-            Minus(model.D, model.D, D_inc);
-            //D =  D - D_inc;
-
-            Scale(W_inc, W_inc, model.momentum);
-            Scale(d_W, d_W, model.epsilon / N);
-            Add(W_inc, W_inc, d_W);
-            //W_inc = W_inc*momentum + d_W*(epsilon/N);
-            Minus(model.W, model.W, W_inc);
-            //W =  W - W_inc;
-
-            //%%%%%%%%%%%%%% Compute Predictions after Parameter Updates %%%%%%%%%%%%%%%%%
-            F = CalcObj(model.D, model.W, train_vec, begin_idx, end_idx, model.lambda, mean_cnt, error,
-                        pred_out);
-            err_train.push_back(sqrt(F / N));
-
-            scheduler.sync();
         }
+
+        reset(d_D);
+        reset(d_W);
+        for (int i = begin_idx; i <= end_idx; i++) {
+            int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
+            for (int j = 0; j < model.num_feat; j++) {
+                d_D[doc_id][j] += Ix_D[i - begin_idx][j];
+                d_W[word_id][j] += Ix_W[i - begin_idx][j];
+            }
+        }
+
+        //%%%%%%%%%%%%%% Compute Predictions after Parameter Updates %%%%%%%%%%%%%%%%%
+        F = CalcObj(model.D, model.W, train_vec, begin_idx, end_idx, model.lambda, mean_cnt, error,
+                    pred_out);
+        err_train.push_back(sqrt(F / N));
+
+        scheduler.sync();
     }
 }
 
@@ -104,11 +75,17 @@ void pmf::Solver::run(vector<vector<double> > &d_D, vector<vector<double> > &d_W
 void pmf::GlobalScheduler::run() {
     for (int epoch = 1; epoch <= maxepoch; ++epoch) {
         sync();
-        validate();
+
+        get_train_loss();
+        get_probe_loss();
+
+        printf("epoch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, err_train.back(), err_valid.back());
     }
 }
 
 void pmf::GlobalScheduler::sync() {
+    MPI_Barrier(MPI_COMM_WORLD);
+
     // Get d_D and d_W of each node
     _sync(d_D, model.num_d, model.num_feat);
     _sync(d_W, model.num_w, model.num_feat);
@@ -123,13 +100,13 @@ void pmf::GlobalScheduler::sync() {
 }
 
 void pmf::GlobalScheduler::_sync(vector<vector<double> > vec, int num_row, int num_col) {
-    double *rows = new double[num_col * (mpi_size - 1)];
+    double *rows = new double[num_col * mpi_size];
     double *row = nullptr;
     for (int i = 0; i < num_row; ++i) {
-        MPI_Gather(row, 0, MPI_DOUBLE, rows, num_col, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Gather(row, 1, MPI_DOUBLE, rows, num_col, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         for (int j = 0; j < num_col; ++j) {
             double avg = 0.0;
-            for (int k = 1; k < mpi_size; ++k) {
+            for (int k = 0; k < mpi_size; ++k) {
                 avg += rows[k * num_col + j];
             }
             avg /= mpi_size - 1;
@@ -138,13 +115,18 @@ void pmf::GlobalScheduler::_sync(vector<vector<double> > vec, int num_row, int n
     }
 }
 
+void pmf::GlobalScheduler::get_train_loss() {
+    vector<vector<double> > error = NewArray(pairs_tr, 1, 0), pred_out = NewArray(pairs_tr, 1, 0);
+    double F = CalcObj(model.D, model.W, train_vec, 0, pairs_tr - 1, model.lambda, mean_cnt, error, pred_out);
+    err_train.push_back(sqrt(F / pairs_tr));
+}
+
 // Compute predictions on the validation set
-void pmf::GlobalScheduler::validate() {
+void pmf::GlobalScheduler::get_probe_loss() {
     double mean_cnt = sum_cnt(train_vec) / pairs_tr;
     vector<vector<double> > test_error = NewArray(pairs_pr, 1, 0), test_pred_out = NewArray(pairs_pr, 1, 0);
     double F = CalcObj(model.D, model.W, probe_vec, 0, pairs_pr - 1, model.lambda, mean_cnt, test_error, test_pred_out);
     err_valid.push_back(sqrt(Sum(Sqr(test_error)) / pairs_pr));
-    printf("epoch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, err_train.back(), err_valid.back());
 }
 
 // Local Scheduler
@@ -152,10 +134,6 @@ void pmf::LocalScheduler::run() {
     Solver solver(*this, train_block, model);
 
     for (int epoch = 1; epoch <= maxepoch; ++epoch) {
-        // clear d_D and d_W to 0
-        Minus(d_D, d_D, d_D);
-        Minus(d_W, d_W, d_W);
-
         // run Solver
         solver.run(d_D, d_W);
 
@@ -172,6 +150,8 @@ void pmf::LocalScheduler::_sync(vector<vector<double> > vec, int num_row, int nu
 }
 
 void pmf::LocalScheduler::sync() {
+    MPI_Barrier(MPI_COMM_WORLD);
+
     // Send d_D and d_W to master node
     _sync(d_D, model.num_d, model.num_feat);
     _sync(d_W, model.num_w, model.num_feat);
