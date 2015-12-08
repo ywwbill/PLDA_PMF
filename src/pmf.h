@@ -126,7 +126,7 @@ namespace pmf {
         std::vector<std::vector<double> > d_D, d_W;
         double mean_cnt;
 
-        void _sync(std::vector<std::vector<double> > vec, int num_row, int num_col);
+        void _sync(std::vector<std::vector<double> > &vec, int num_row, int num_col);
     };
 
 
