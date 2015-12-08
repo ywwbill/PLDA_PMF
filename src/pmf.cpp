@@ -125,7 +125,7 @@ void pmf::GlobalScheduler::sync() {
     cout << "All synced!" << endl;
 }
 
-void pmf::GlobalScheduler::_sync(vector<vector<double> > vec, int num_row, int num_col) {
+void pmf::GlobalScheduler::_sync(vector<vector<double> > &vec, int num_row, int num_col) {
     double *rows = new double[num_col * mpi_size];
     double *row = new double[num_col];
     for (int i = 0; i < num_row; ++i) {
