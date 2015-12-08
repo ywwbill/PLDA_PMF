@@ -26,15 +26,13 @@ MPI_Datatype MPI_Triplet;
 
 // Solver
 void pmf::Solver::run(vector<vector<double> > &d_D, vector<vector<double> > &d_W) {
-
-    int pairs_tr = block.size();
+    int pairs_tr = train_vec.size();
     double mean_cnt = sum_cnt(train_vec) / pairs_tr;
 
-    int numbatches = 10; // Number of batches
-    int NN = (pairs_tr - 1) / numbatches + 1; // number training triplets per batch
+    int num_batches = 10; // Number of batches
+    int NN = (pairs_tr - 1) / num_batches + 1; // number training triplets per batch
 
-    vector<vector<double> > D_inc = NewArray(model.num_d, model.num_feat, 0), W_inc = NewArray(model.num_w,
-                                                                                               model.num_feat, 0);
+    vector<vector<double> > D_inc = NewArray(model.num_d, model.num_feat, 0), W_inc = NewArray(model.num_w, model.num_feat, 0);
     vector<vector<double> > error = NewArray(NN, 1, 0), pred_out = NewArray(NN, 1, 0);
 
     vector<vector<double> > Ix_D = NewArray(NN, model.num_feat, 0), Ix_W = NewArray(NN, model.num_feat,
@@ -46,7 +44,7 @@ void pmf::Solver::run(vector<vector<double> > &d_D, vector<vector<double> > &d_W
         // Random permute training data.
         std::random_shuffle(train_vec.begin(), train_vec.end());
 
-        for (int batch = 1; batch <= numbatches; batch++) {
+        for (int batch = 1; batch <= num_batches; batch++) {
 
             int begin_idx = (batch - 1) * NN, end_idx = min(batch * NN - 1, pairs_tr - 1), N =
                     end_idx - begin_idx + 1;
@@ -105,6 +103,7 @@ void pmf::Solver::run(vector<vector<double> > &d_D, vector<vector<double> > &d_W
 void pmf::GlobalScheduler::run() {
     for (int epoch = 1; epoch <= maxepoch; ++epoch) {
         sync();
+        validate();
     }
 }
 
@@ -144,8 +143,7 @@ void pmf::GlobalScheduler::validate() {
     vector<vector<double> > test_error = NewArray(pairs_pr, 1, 0), test_pred_out = NewArray(pairs_pr, 1, 0);
     double F = CalcObj(model.D, model.W, probe_vec, 0, pairs_pr - 1, model.lambda, mean_cnt, test_error, test_pred_out);
     err_valid.push_back(sqrt(Sum(Sqr(test_error)) / pairs_pr));
-    printf("epoch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, err_train.back(),
-           err_valid.back());
+    printf("epoch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, err_train.back(), err_valid.back());
 }
 
 // Local Scheduler
@@ -202,13 +200,13 @@ pmf_model init_mode() {
 
 void create_triplet_type() {
     const int num_elem = 3;
-    int blocklengths[num_elem] = {1, 1, 1};
+    int block_lengths[num_elem] = {1, 1, 1};
     MPI_Datatype types[] = {MPI_INT, MPI_INT, MPI_DOUBLE};
     MPI_Aint offsets[num_elem];
     offsets[0] = offsetof(Triplet, doc_id);
     offsets[1] = offsetof(Triplet, word_id);
     offsets[2] = offsetof(Triplet, cnt);
-    MPI_Type_create_struct(num_elem, blocklengths, offsets, types, &MPI_Triplet);
+    MPI_Type_create_struct(num_elem, block_lengths, offsets, types, &MPI_Triplet);
     MPI_Type_commit(&MPI_Triplet);
 }
 
@@ -239,10 +237,10 @@ int main(int argc, char **argv) {
         int cur_doc_id = 0;
 
         // load train and probe data
+        cout << "Load Train and Probe Data." << endl;
         vector<Triplet> all_data_vec;
         load_data(train_file, all_data_vec, tmp_num_d, model.num_w, cur_doc_id); // Triplets: {doc_id, word_id, cnt}
         load_data(probe_file, all_data_vec, tmp_num_d, model.num_w, cur_doc_id);
-        model.num_d = cur_doc_id;
 
         // shuffle data
         for (int i = 0; i < all_data_vec.size(); i++) {
@@ -252,20 +250,24 @@ int main(int argc, char **argv) {
         all_data_vec.clear();
 
         // transfer train_vec
+        cout << "Transfering train_vec...";
         num_train = train_vec.size();
         MPI_Bcast(&num_train, 1, MPI_INT, 0, MPI_COMM_WORLD);
         MPI_Bcast(&train_vec[0], num_train, MPI_Triplet, 0, MPI_COMM_WORLD);
+        cout << "...finished!" << endl;
 
         Block train_block(train_vec);
         Block probe_block(probe_vec);
 
         GlobalScheduler scheduler(model, train_block, probe_block, maxepoch, mpi_size);
+        cout << "Running scheduler" << endl;
         scheduler.run();
     } else {
         // Local Scheduler
 
+        // Sync train_vec
         MPI_Bcast(&num_train, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        train_vec.reserve(num_train);
+        train_vec.resize(num_train);
         MPI_Bcast(&train_vec[0], num_train, MPI_Triplet, 0, MPI_COMM_WORLD);
 
         Block train_block(train_vec);
