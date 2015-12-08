@@ -135,7 +135,6 @@ void pmf::GlobalScheduler::_sync(vector<vector<double> > &vec, int num_row, int 
             for (int k = 0; k < mpi_size; ++k) {
                 avg += rows[k * num_col + j];
             }
-            avg /= mpi_size;
             vec[i][j] = avg;
         }
     }
@@ -149,7 +148,6 @@ void pmf::GlobalScheduler::get_train_loss() {
 
 // Compute predictions on the validation set
 void pmf::GlobalScheduler::get_probe_loss() {
-    double mean_cnt = sum_cnt(train_vec) / pairs_tr;
     vector<vector<double> > test_error = NewArray(pairs_pr, 1, 0), test_pred_out = NewArray(pairs_pr, 1, 0);
     double F = CalcObj(model.D, model.W, probe_vec, 0, pairs_pr - 1, model.lambda, mean_cnt, test_error, test_pred_out);
     err_valid.push_back(sqrt(Sum(Sqr(test_error)) / pairs_pr));

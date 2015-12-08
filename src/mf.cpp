@@ -134,8 +134,7 @@ int main(int argc, char **argv) {
             //%%% Compute predictions on the validation set %%%%%%%%%%%%%%%%%%%%%%
             F = CalcObj(D, W, probe_vec, 0, pairs_pr - 1, lambda, mean_cnt, test_error, test_pred_out);
             err_valid.push_back(sqrt(Sum(Sqr(test_error)) / pairs_pr));
-            printf("epoch %4i batch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, batch, err_train.back(),
-                   err_valid.back());
+            printf("epoch %4i batch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, batch, err_train.back(), err_valid.back());
         }
         //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     }
