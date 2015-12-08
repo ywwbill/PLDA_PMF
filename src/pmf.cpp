@@ -10,6 +10,7 @@
 #include <iostream>
 #include <vector>
 #include <mpi.h>
+#include <stddef.h>
 
 #include <boost/serialization/vector.hpp> // To serilize D and W
 
@@ -201,11 +202,11 @@ pmf_model init_mode() {
 void create_triplet_type() {
     const int num_elem = 3;
     int block_lengths[num_elem] = {1, 1, 1};
-    MPI_Datatype types[] = {MPI_INT, MPI_INT, MPI_DOUBLE};
+    MPI_Datatype types[num_elem] = {MPI_INT, MPI_INT, MPI_DOUBLE};
     MPI_Aint offsets[num_elem];
-    offsets[0] = offsetof(Triplet, doc_id);
-    offsets[1] = offsetof(Triplet, word_id);
-    offsets[2] = offsetof(Triplet, cnt);
+    offsets[0] = offsetof(TripletType, doc_id);
+    offsets[1] = offsetof(TripletType, word_id);
+    offsets[2] = offsetof(TripletType, cnt);
     MPI_Type_create_struct(num_elem, block_lengths, offsets, types, &MPI_Triplet);
     MPI_Type_commit(&MPI_Triplet);
 }

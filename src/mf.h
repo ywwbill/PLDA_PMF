@@ -22,12 +22,13 @@
 /*
 	Triplet structure where each triplet is {doc_id, word_id, cnt}
 */
-struct Triplet {
+typedef struct Triplet {
     int doc_id, word_id;
     double cnt;
 
+    Triplet() : doc_id(-1), word_id(-1), cnt(0.0) {}
     Triplet(int dd, int ww, double cc) : doc_id(dd), word_id(ww), cnt(cc) { }
-};
+} TripletType;
 
 bool ParseMainArgs(int argc, char **argv, std::string &train_file, std::string &probe_file);
 
