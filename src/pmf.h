@@ -112,6 +112,8 @@ namespace pmf {
 
         void sync();
 
+        void update_weight();
+
         void get_train_loss();
 
         void get_probe_loss();

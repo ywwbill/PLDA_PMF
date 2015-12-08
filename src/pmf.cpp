@@ -83,6 +83,25 @@ void pmf::GlobalScheduler::run() {
     }
 }
 
+void pmf::GlobalScheduler::update_weight() {
+    cout << "Updating weights" << endl;
+
+    //%%%% Update doc and word features %%%%%%%%%%%
+    Scale(D_inc, D_inc, model.momentum);
+    Scale(d_D, d_D, model.epsilon);
+    Add(D_inc, D_inc, d_D);
+    //D_inc = D_inc*momentum + d_D*(epsilon/N);
+    Minus(model.D, model.D, D_inc);
+    //D =  D - D_inc;
+
+    Scale(W_inc, W_inc, model.momentum);
+    Scale(d_W, d_W, model.epsilon);
+    Add(W_inc, W_inc, d_W);
+    //W_inc = W_inc*momentum + d_W*(epsilon/N);
+    Minus(model.W, model.W, W_inc);
+    //W =  W - W_inc;
+}
+
 void pmf::GlobalScheduler::sync() {
     cout << "Sync..." << endl;
     MPI_Barrier(MPI_COMM_WORLD);
@@ -92,13 +111,18 @@ void pmf::GlobalScheduler::sync() {
     _sync(d_W, model.num_w, model.num_feat);
     cout << "d_D and d_W synced!" << endl;
 
+    // Update D and W using d_D and d_W
+    update_weight();
+
     // Send new D and W back
+    cout << "Sync D and W" << endl;
     for (int i = 0; i < model.num_d; ++i) {
-        MPI_Bcast(&model.D[i], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&model.D[i][0], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
     for (int i = 0; i < model.num_w; ++i) {
-        MPI_Bcast(&model.W[i], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&model.W[i][0], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
+    cout << "All synced!" << endl;
 }
 
 void pmf::GlobalScheduler::_sync(vector<vector<double> > vec, int num_row, int num_col) {
@@ -160,10 +184,10 @@ void pmf::LocalScheduler::sync() {
 
     // Get new D and W
     for (int i = 0; i < model.num_d; ++i) {
-        MPI_Bcast(&model.D[i], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&model.D[i][0], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
     for (int i = 0; i < model.num_w; ++i) {
-        MPI_Bcast(&model.W[i], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&model.W[i][0], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
 }
 
