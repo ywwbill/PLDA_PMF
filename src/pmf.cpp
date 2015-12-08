@@ -90,6 +90,7 @@ void pmf::GlobalScheduler::sync() {
     // Get d_D and d_W of each node
     _sync(d_D, model.num_d, model.num_feat);
     _sync(d_W, model.num_w, model.num_feat);
+    cout << "d_D and d_W synced!" << endl;
 
     // Send new D and W back
     for (int i = 0; i < model.num_d; ++i) {
@@ -110,7 +111,7 @@ void pmf::GlobalScheduler::_sync(vector<vector<double> > vec, int num_row, int n
             for (int k = 0; k < mpi_size; ++k) {
                 avg += rows[k * num_col + j];
             }
-            avg /= mpi_size - 1;
+            avg /= mpi_size;
             vec[i][j] = avg;
         }
     }
