@@ -84,6 +84,7 @@ void pmf::GlobalScheduler::run() {
 }
 
 void pmf::GlobalScheduler::sync() {
+    cout << "Sync..." << endl;
     MPI_Barrier(MPI_COMM_WORLD);
 
     // Get d_D and d_W of each node
@@ -101,9 +102,9 @@ void pmf::GlobalScheduler::sync() {
 
 void pmf::GlobalScheduler::_sync(vector<vector<double> > vec, int num_row, int num_col) {
     double *rows = new double[num_col * mpi_size];
-    double *row = nullptr;
+    double *row = new double[num_col];
     for (int i = 0; i < num_row; ++i) {
-        MPI_Gather(row, 1, MPI_DOUBLE, rows, num_col, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Gather(row, num_col, MPI_DOUBLE, rows, num_col, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         for (int j = 0; j < num_col; ++j) {
             double avg = 0.0;
             for (int k = 0; k < mpi_size; ++k) {
