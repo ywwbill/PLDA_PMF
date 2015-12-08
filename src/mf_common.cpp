@@ -17,7 +17,6 @@ vector<vector<double> > NewArray(int n, int m, int default_val) {
                 a[i][j] = 0.1 * ((double) rand()) / RAND_MAX;
     }
     return a;
-
 }
 
 /*

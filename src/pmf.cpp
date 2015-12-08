@@ -191,12 +191,14 @@ void pmf::LocalScheduler::sync() {
     }
 }
 
+vector<vector<double> > D, W;
+
 pmf_model init_mode() {
     int num_d = 2020; // Number of docs
     int num_w = 7167; // Number of words
     int num_feat = 10; // Rank 10 decomposition
-    auto D = NewArray(num_d, num_feat, RANDOM); // Doc feature vectors
-    auto W = NewArray(num_w, num_feat, 0); // Word feature vecators
+    D = NewArray(num_d, num_feat, RANDOM); // Doc feature vectors
+    W = NewArray(num_w, num_feat, 0); // Word feature vecators
 
     pmf_model model(num_d, num_w, num_feat, D, W);
     model.epsilon = 5; // Learning rate
