@@ -30,14 +30,15 @@ using namespace std;
 	main
 */
 int main(int argc, char **argv) {
+    srand(time(0));
     string train_file = "";
     string probe_file = "";
 
     if (!ParseMainArgs(argc, argv, train_file, probe_file)) return 0;
 
 
-    double epsilon = 5; // Learning rate
-    double lambda = 1; // Regularization parameter
+    double epsilon = 100; // Learning rate
+    double lambda = 2.0; // Regularization parameter
     double momentum = 0.9;
 
 
@@ -56,7 +57,7 @@ int main(int argc, char **argv) {
     num_d = cur_doc_id;
 
     for (int i = 0; i < all_data_vec.size(); i++) {
-        if (rand() % 100 < 90) train_vec.push_back(all_data_vec[i]);
+        if (rand() % 100 < 95) train_vec.push_back(all_data_vec[i]);
         else probe_vec.push_back(all_data_vec[i]);
     }
     all_data_vec.clear();
@@ -66,17 +67,16 @@ int main(int argc, char **argv) {
 
     double mean_cnt = sum_cnt(train_vec) / pairs_tr;
 
-    int numbatches = 10; // Number of batches
+    int numbatches = 1; // Number of batches
     int NN = (pairs_tr - 1) / numbatches + 1; // number training triplets per batch
 
-    vector<vector<double> > D = NewArray(num_d, num_feat, RANDOM); // Doc feature vectors
-    vector<vector<double> > W = NewArray(num_w, num_feat, 0);// Word feature vecators
-    vector<vector<double> > D_inc = NewArray(num_d, num_feat, 0), W_inc = NewArray(num_w, num_feat, 0);
-    vector<vector<double> > error = NewArray(NN, 1, 0), pred_out = NewArray(NN, 1, 0), test_error = NewArray(pairs_pr, 1, 0), test_pred_out = NewArray(pairs_pr, 1, 0);
+    Mat D(num_d, num_feat, RANDOM); // Doc feature vectors
+    Mat W(num_w, num_feat, 0);// Word feature vecators
+    Mat D_inc(num_d, num_feat, 0), W_inc(num_w, num_feat, 0);
+    vector<double> error(NN, 0), pred_out(NN, 0), test_error(pairs_pr, 0), test_pred_out(pairs_pr, 0);
 
-    vector<vector<double> > Ix_D = NewArray(NN, num_feat, 0), Ix_W = NewArray(NN, num_feat,
-                                                                              0); // gradient w.r.t. training sample
-    vector<vector<double> > d_D = NewArray(num_d, num_feat, 0), d_W = NewArray(num_w, num_feat, 0);
+    Mat Ix_D(NN, num_feat, 0), Ix_W(NN, num_feat, 0); // gradient w.r.t. training sample
+    Mat d_D(num_d, num_feat, 0), d_W(num_w, num_feat, 0);
 
     double F = 0.0;
 
@@ -95,9 +95,9 @@ int main(int argc, char **argv) {
             for (int i = begin_idx; i <= end_idx; i++) {
                 int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
                 for (int j = 0; j < num_feat; j++) {
-                    double dd = D[doc_id][j], ww = W[word_id][j];
-                    Ix_D[i - begin_idx][j] = error[i - begin_idx][0] * 2 * ww + lambda * dd;
-                    Ix_W[i - begin_idx][j] = error[i - begin_idx][0] * 2 * dd + lambda * ww;
+                    double dd = D.get(doc_id, j), ww = W.get(word_id, j);
+                    Ix_D.set(i - begin_idx, j, error[i - begin_idx] * 2 * ww + lambda * dd);
+                    Ix_W.set(i - begin_idx, j, error[i - begin_idx] * 2 * dd + lambda * ww);
                 }
             }
 
@@ -106,24 +106,24 @@ int main(int argc, char **argv) {
             for (int i = begin_idx; i <= end_idx; i++) {
                 int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
                 for (int j = 0; j < num_feat; j++) {
-                    d_D[doc_id][j] += Ix_D[i - begin_idx][j];
-                    d_W[word_id][j] += Ix_W[i - begin_idx][j];
+                    d_D.set(doc_id, j, d_D.get(doc_id,j)+Ix_D.get(i - begin_idx,j));
+                    d_W.set(word_id, j, d_W.get(word_id, j) + Ix_W.get(i - begin_idx,j));
                 }
             }
 
             //%%%% Update doc and word features %%%%%%%%%%%
-            Scale(D_inc, D_inc, momentum);
-            Scale(d_D, d_D, epsilon / N);
-            Add(D_inc, D_inc, d_D);
+            Scale(D_inc, momentum);
+            Scale(d_D, epsilon / N);
+            Add(D_inc, d_D);
             //D_inc = D_inc*momentum + d_D*(epsilon/N);
-            Minus(D, D, D_inc);
+            Minus(D, D_inc);
             //D =  D - D_inc;
 
-            Scale(W_inc, W_inc, momentum);
-            Scale(d_W, d_W, epsilon / N);
-            Add(W_inc, W_inc, d_W);
+            Scale(W_inc, momentum);
+            Scale(d_W, epsilon / N);
+            Add(W_inc, d_W);
             //W_inc = W_inc*momentum + d_W*(epsilon/N);
-            Minus(W, W, W_inc);
+            Minus(W, W_inc);
             //W =  W - W_inc;
 
             //%%%%%%%%%%%%%% Compute Predictions after Parameter Updates %%%%%%%%%%%%%%%%%
@@ -133,8 +133,8 @@ int main(int argc, char **argv) {
             //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             //%%% Compute predictions on the validation set %%%%%%%%%%%%%%%%%%%%%%
             F = CalcObj(D, W, probe_vec, 0, pairs_pr - 1, lambda, mean_cnt, test_error, test_pred_out);
-            err_valid.push_back(sqrt(Sum(Sqr(test_error)) / pairs_pr));
-            printf("epoch %4i batch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, batch, err_train.back(), err_valid.back());
+            err_valid.push_back(sqrt(SqrSum(test_error) / pairs_pr));
+            if (batch==numbatches) printf("epoch %4i batch %4i Training RMSE %6.4f  Test RMSE %6.10f  \n", epoch, batch, err_train.back(), err_valid.back());
         }
         //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     }

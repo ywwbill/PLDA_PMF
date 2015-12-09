@@ -9,57 +9,41 @@ using namespace std;
 vector<Triplet> train_vec, probe_vec;
 vector<double> err_train, err_valid;
 
-vector<vector<double> > NewArray(int n, int m, int default_val) {
-    vector<vector<double> > a(n, vector<double>(m));
-    if (default_val == RANDOM) {
-        for (int i = 0; i < a.size(); i++)
-            for (int j = 0; j < a[0].size(); j++)
-                a[i][j] = 0.1 * ((double) rand()) / RAND_MAX;
-    }
-    return a;
-}
-
 /*
 	Add two matrix elementwise. Throw exception if their dimensions don't match.
 */
-void Add(vector<vector<double> > &res, const vector<vector<double> > lhs, const vector<vector<double> > rhs) {
-    if (rhs.size() != lhs.size() || rhs[0].size() != lhs[0].size()) {
+void Add(Mat &res, const Mat &rhs) {
+    if (rhs.n != res.n || rhs.m != res.m) {
         throw invalid_argument("matrix dimensions are not consistent when trying add two matrices");
         return;
     }
-    res.clear();
-    res = NewArray(lhs.size(), lhs[0].size(), 0);
-    for (int i = 0; i < lhs.size(); i++) {
-        for (int j = 0; j < lhs[0].size(); j++)
-            res[i][j] = lhs[i][j] + rhs[i][j];
+    for (int i = 0; i < res.n; i++) {
+        for (int j = 0; j < res.m; j++)
+            res.set(i, j, res.get(i,j)+rhs.get(i,j));
     }
 }
 
 /*
 	Substraction. Throw exception if their dimensions don't match.
 */
-void Minus(vector<vector<double> > &res, const vector<vector<double> > lhs, const vector<vector<double> > rhs) {
-    if (rhs.size() != lhs.size() || rhs[0].size() != lhs[0].size()) {
+void Minus(Mat &res, const Mat & rhs) {
+    if (rhs.n != res.n || rhs.m != res.m) {
         throw invalid_argument("matrix dimensions are not consistent when trying add two matrices");
         return;
     }
-    res.clear();
-    res = NewArray(lhs.size(), lhs[0].size(), 0);
-    for (int i = 0; i < lhs.size(); i++) {
-        for (int j = 0; j < lhs[0].size(); j++)
-            res[i][j] = lhs[i][j] - rhs[i][j];
+    for (int i = 0; i < res.n; i++) {
+        for (int j = 0; j < res.m; j++)
+            res.set(i, j, res.get(i,j)-rhs.get(i,j));
     }
 }
 
 /*
 	Multiply by a number.
 */
-void Scale(vector<vector<double> > &res, const vector<vector<double> > lhs, const double &mult) {
-    res.clear();
-    res = NewArray(lhs.size(), lhs[0].size(), 0);
-    for (int i = 0; i < lhs.size(); i++) {
-        for (int j = 0; j < lhs[0].size(); j++)
-            res[i][j] = lhs[i][j] * mult;
+void Scale(Mat &res, const double &mult) {
+    for (int i = 0; i < res.n; i++) {
+        for (int j = 0; j < res.m; j++)
+            res.set(i, j, res.get(i,j) * mult);
     }
 }
 
@@ -74,31 +58,19 @@ Type sqr(Type x) {
 
 
 /*
-	Elementwise square the matrix.
+	Sum of Elementwise square.
 */
-vector<vector<double> > Sqr(const vector<vector<double> > &arr) {
-    vector<vector<double> > res = NewArray(arr.size(), arr[0].size(), 0);
+double SqrSum(const vector<double> &arr) {
+    double s = 0;
     for (int i = 0; i < arr.size(); i++)
-        for (int j = 0; j < arr[0].size(); j++)
-            res[i][j] = sqr(arr[i][j]);
-    return res;
-}
-
-/*
-	Return the sum of all elements in the matrix.
-*/
-double Sum(const vector<vector<double> > &arr) {
-    double s;
-    for (int i = 0; i < arr.size(); i++)
-        for (int j = 0; j < arr[0].size(); j++)
-            s += arr[i][j];
+            s+=sqr(arr[i]);
     return s;
 }
 
-void reset(vector<vector<double> > &arr) {
-    for (int i = 0; i < arr.size(); i++)
-        for (int j = 0; j < arr[0].size(); j++)
-            arr[i][j] = 0;
+void reset(Mat &arr) {
+    for (int i = 0; i < arr.n; i++)
+        for (int j = 0; j < arr.m; j++)
+            arr.set(i, j, 0);
 }
 
 /*
@@ -150,26 +122,27 @@ void load_data(string data_file, vector<Triplet> &data_vec, int &num_d, int &num
 		F = acc_error + doc_reg + word_reg
 			= sum_{(doc_id, word_id, cnt):train_vec} (cnt - D(doc_id)*W(word_id))^2 + 0.5*lambda*(|D|^2 + |W|^2)
 */
-double CalcObj(const vector<vector<double> > &D, const vector<vector<double> > &W, const vector<Triplet> &train_vec,
+double CalcObj(const Mat &D, const Mat &W, const vector<Triplet> &train_vec,
                const int &begin_idx, const int &end_idx, const double &lambda, const double &mean_cnt,
-               vector<vector<double> > &error, vector<vector<double> > &pred_out) {
+               vector<double> &error, vector<double> &pred_out) {
     double acc_error = 0.0, doc_reg = 0.0, word_reg = 0.0;
+
     for (int i = begin_idx; i <= end_idx; i++) {
         int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
         double cnt = train_vec[i].cnt;
 
         // calculate the prediction: inner product of D(doc_id), W(word_id)
         double predict = 0.0;
-        for (int j = 0; j < D[0].size(); j++) {
-            double dd = D[doc_id][j], ww = W[word_id][j];
+        for (int j = 0; j < D.m; j++) {
+            double dd = D.get(doc_id,j), ww = W.get(word_id, j);
             predict += (dd * ww);
             doc_reg += sqr(dd);
             word_reg += sqr(ww);
         }
-        pred_out[i - begin_idx][0] = predict + mean_cnt;
-        error[i - begin_idx][0] = pred_out[i - begin_idx][0] - train_vec[i].cnt;
+        pred_out[i - begin_idx] = predict + mean_cnt;
+        error[i - begin_idx] = pred_out[i - begin_idx] - train_vec[i].cnt;
         // calculate the error between predict and ground truth cnt
-        acc_error += sqr(pred_out[i - begin_idx][0] - train_vec[i].cnt);
+        acc_error += sqr(pred_out[i - begin_idx] - train_vec[i].cnt);
     }
     // Objective function value
     double F = acc_error + 0.5 * lambda * (doc_reg + word_reg);

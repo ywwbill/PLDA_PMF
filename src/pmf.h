@@ -36,6 +36,8 @@ namespace pmf {
 
         size_t size() { return _vec.size(); }
 
+        void append(Triplet triplet) { _vec.push_back(triplet); };
+
     private:
         std::vector<Triplet> &_vec;
         std::vector<Triplet>::iterator current;
@@ -65,6 +67,10 @@ namespace pmf {
         virtual void sync() { };
 
         void update_weight();
+
+        void get_train_loss();
+
+        void get_probe_loss();
 
     protected:
         std::vector<std::vector<double> > d_D, d_W;
@@ -103,10 +109,6 @@ namespace pmf {
 
         void sync();
 
-        void get_train_loss();
-
-        void get_probe_loss();
-
     protected:
         int epoch;
 
@@ -143,7 +145,22 @@ namespace pmf {
         BlockGlobalScheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size)
                 : Scheduler(model, train_block, probe_block, maxepoch, mpi_size) {};
 
+        void run();
+
         void sync();
+    };
+
+    class BlockLocalScheduler : Scheduler {
+    public:
+        BlockLocalScheduler(pmf_model &model, Block &train_block, int maxepoch, int mpi_size)
+                : Scheduler(model, train_block, train_block, maxepoch, mpi_size) {};
+
+        void run();
+
+        void sync();
+
+    protected:
+        int epoch;
     };
 
     // TODO: implement lock free scheduler

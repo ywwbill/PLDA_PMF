@@ -113,7 +113,26 @@ void pmf::GlobalScheduler::sync() {
     cout << "All synced!" << endl;
 }
 
-// TODO:
+void pmf::BlockGlobalScheduler::run() {
+    // TODO: partition
+    vector<vector<Block>> blocks(mpi_size - 1, vector<Block>(mpi_size - 1));
+    for (int i = 0; i < train_vec.size(); ++i) {
+        int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
+        blocks[doc_id / mpi_size][word_id / mpi_size].append(train_vec[i]);
+    }
+
+    for (int epoch = 1; epoch <= maxepoch; ++epoch) {
+        sync();
+
+        get_train_loss();
+        get_probe_loss();
+
+        printf("epoch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, err_train.back(), err_valid.back());
+    }
+}
+
+
+// TODO: partition by blocks
 void pmf::BlockGlobalScheduler::sync() {
     cout << "Sync..." << endl;
     MPI_Barrier(MPI_COMM_WORLD);
@@ -152,14 +171,14 @@ void pmf::GlobalScheduler::_sync(vector<vector<double> > &vec, int num_row, int 
     }
 }
 
-void pmf::GlobalScheduler::get_train_loss() {
+void pmf::Scheduler::get_train_loss() {
     vector<vector<double> > error = NewArray(pairs_tr, 1, 0), pred_out = NewArray(pairs_tr, 1, 0);
     double F = CalcObj(model.D, model.W, train_vec, 0, pairs_tr - 1, model.lambda, mean_cnt, error, pred_out);
     err_train.push_back(sqrt(F / pairs_tr));
 }
 
 // Compute predictions on the validation set
-void pmf::GlobalScheduler::get_probe_loss() {
+void pmf::Scheduler::get_probe_loss() {
     vector<vector<double> > test_error = NewArray(pairs_pr, 1, 0), test_pred_out = NewArray(pairs_pr, 1, 0);
     double F = CalcObj(model.D, model.W, probe_vec, 0, pairs_pr - 1, model.lambda, mean_cnt, test_error, test_pred_out);
     err_valid.push_back(sqrt(Sum(Sqr(test_error)) / pairs_pr));
@@ -167,6 +186,19 @@ void pmf::GlobalScheduler::get_probe_loss() {
 
 // Local Scheduler
 void pmf::LocalScheduler::run() {
+    Solver solver(*this, train_block, model);
+
+    for (int epoch = 1; epoch <= maxepoch; ++epoch) {
+        // run Solver
+        solver.run(d_D, d_W);
+
+        // Sync parameters
+        sync();
+    }
+}
+
+// TODO: rotate blocks
+void pmf::BlockLocalScheduler::run() {
     Solver solver(*this, train_block, model);
 
     for (int epoch = 1; epoch <= maxepoch; ++epoch) {
