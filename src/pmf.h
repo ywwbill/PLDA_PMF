@@ -132,7 +132,8 @@ namespace pmf {
 
     class Solver {
     public:
-        Solver(Scheduler &scheduler, Block &block, pmf_model &model) : scheduler(scheduler), block(block), model(model) {
+        Solver(Scheduler &scheduler, Block &block, pmf_model &model) : scheduler(scheduler), block(block),
+                                                                       model(model) {
             pairs_tr = train_vec.size();
             mean_cnt = sum_cnt(train_vec) / pairs_tr;
         }

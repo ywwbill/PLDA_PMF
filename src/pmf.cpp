@@ -33,41 +33,29 @@ void pmf::Solver::run(vector<vector<double> > &d_D, vector<vector<double> > &d_W
 
     double F = 0.0;
 
-    for (int epoch = 0; epoch < maxepoch; epoch++) {
-        // Random permute training data.
-        std::random_shuffle(train_vec.begin(), train_vec.end());
+    int begin_idx = (my_rank - 1) * NN, end_idx = min(my_rank * NN - 1, pairs_tr - 1), N = end_idx - begin_idx + 1;
 
-        int begin_idx = (my_rank - 1) * NN, end_idx = min(my_rank * NN - 1, pairs_tr - 1), N = end_idx - begin_idx + 1;
+    //%%%%%%%%%%%%%% Compute Predictions %%%%%%%%%%%%%%%%%
+    F = CalcObj(model.D, model.W, train_vec, begin_idx, end_idx, model.lambda, mean_cnt, error, pred_out);
 
-        //%%%%%%%%%%%%%% Compute Predictions %%%%%%%%%%%%%%%%%
-        F = CalcObj(model.D, model.W, train_vec, begin_idx, end_idx, model.lambda, mean_cnt, error, pred_out);
-
-        //%%%%%%%%%%%%%% Compute Gradients %%%%%%%%%%%%%%%%%%%
-        for (int i = begin_idx; i <= end_idx; i++) {
-            int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
-            for (int j = 0; j < model.num_feat; j++) {
-                double dd = model.D[doc_id][j], ww = model.W[word_id][j];
-                Ix_D[i - begin_idx][j] = error[i - begin_idx][0] * 2 * ww + model.lambda * dd;
-                Ix_W[i - begin_idx][j] = error[i - begin_idx][0] * 2 * dd + model.lambda * ww;
-            }
+    //%%%%%%%%%%%%%% Compute Gradients %%%%%%%%%%%%%%%%%%%
+    for (int i = begin_idx; i <= end_idx; i++) {
+        int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
+        for (int j = 0; j < model.num_feat; j++) {
+            double dd = model.D[doc_id][j], ww = model.W[word_id][j];
+            Ix_D[i - begin_idx][j] = error[i - begin_idx][0] * 2 * ww + model.lambda * dd;
+            Ix_W[i - begin_idx][j] = error[i - begin_idx][0] * 2 * dd + model.lambda * ww;
         }
+    }
 
-        reset(d_D);
-        reset(d_W);
-        for (int i = begin_idx; i <= end_idx; i++) {
-            int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
-            for (int j = 0; j < model.num_feat; j++) {
-                d_D[doc_id][j] += Ix_D[i - begin_idx][j];
-                d_W[word_id][j] += Ix_W[i - begin_idx][j];
-            }
+    reset(d_D);
+    reset(d_W);
+    for (int i = begin_idx; i <= end_idx; i++) {
+        int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
+        for (int j = 0; j < model.num_feat; j++) {
+            d_D[doc_id][j] += Ix_D[i - begin_idx][j];
+            d_W[word_id][j] += Ix_W[i - begin_idx][j];
         }
-
-        //%%%%%%%%%%%%%% Compute Predictions after Parameter Updates %%%%%%%%%%%%%%%%%
-        F = CalcObj(model.D, model.W, train_vec, begin_idx, end_idx, model.lambda, mean_cnt, error,
-                    pred_out);
-        err_train.push_back(sqrt(F / N));
-
-        scheduler.sync();
     }
 }
 
