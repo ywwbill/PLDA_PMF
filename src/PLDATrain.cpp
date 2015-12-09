@@ -50,6 +50,7 @@ int main(int argc, char** argv) //argv[1]: corpusFileName  argv[2]: thetaFileNam
 
 	int rank,numThreads;
 	MPI_Init(&argc, &argv);
+	double startTime=MPI_Wtime();
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &numThreads);
 	MPI_Status status;
@@ -460,6 +461,9 @@ int main(int argc, char** argv) //argv[1]: corpusFileName  argv[2]: thetaFileNam
 	{
 		MPI_Send(&(localTheta[0][0]), numLocalDocs*numTopics, MPI_DOUBLE, 0, rank, MPI_COMM_WORLD);
 	}
+
+	double endTime=MPI_Wtime();
+	cout << "Thread " << rank << " compute time: " << endTime-startTime << endl;
 
 	MPI_Finalize();
 	return 0;
