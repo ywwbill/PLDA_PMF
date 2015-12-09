@@ -211,7 +211,7 @@ pmf_model init_mode() {
     W = NewArray(num_w, num_feat, 0); // Word feature vecators
 
     pmf_model model(num_d, num_w, num_feat, D, W);
-    model.epsilon = 5; // Learning rate
+    model.epsilon = 0.00001; // Learning rate
     model.lambda = 1; // Regularization parameter
     model.momentum = 0.9;
     return model;
