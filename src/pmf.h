@@ -21,8 +21,7 @@ namespace pmf {
         std::vector<std::vector<double> > &W; // Word feature vecators
 
         pmf_model(int num_d, int num_w, int num_feat, std::vector<std::vector<double> > &D,
-                  std::vector<std::vector<double> > &W) : num_d(num_d), num_w(num_w),
-                                                          num_feat(num_feat), D(D), W(W) { }
+                  std::vector<std::vector<double> > &W) : num_d(num_d), num_w(num_w), num_feat(num_feat), D(D), W(W) { }
     };
 
 
@@ -44,64 +43,76 @@ namespace pmf {
 
     class Scheduler {
     public:
-        Scheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size)
-                : model(model), train_block(train_block), probe_block(probe_block), mpi_size(mpi_size),
-                  maxepoch(maxepoch) {
-            pairs_tr = train_block.size();
-            pairs_pr = probe_block.size();
-            d_D = NewArray(model.num_d, model.num_feat, 0);
-            d_W = NewArray(model.num_w, model.num_feat, 0);
-            D_inc = NewArray(model.num_d, model.num_feat, 0);
-            W_inc = NewArray(model.num_w, model.num_feat, 0);
-            mean_cnt = sum_cnt(train_vec) / pairs_tr;
-        };
+        Scheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size) : model(model),
+                                                                                                          train_block(
+                                                                                                                  train_block),
+                                                                                                          probe_block(
+                                                                                                                  probe_block),
+                                                                                                          mpi_size(
+                                                                                                                  mpi_size),
+                                                                                                          _is_terminated(
+                                                                                                                  false),
+                                                                                                          maxepoch(
+                                                                                                                  maxepoch) { };
 
         Scheduler(const Scheduler &) = delete;
 
         Scheduler &operator=(const Scheduler &) = delete;
 
+        bool is_terminated() { return _is_terminated; }
+
         void run();
 
         virtual void sync() { };
 
-        void update_weight();
-
     protected:
-        std::vector<std::vector<double> > d_D, d_W;
-        std::vector<std::vector<double> > D_inc, W_inc;
-        double mean_cnt;
+        bool _is_terminated;
         pmf_model &model;
         std::vector<Block> blocks;
         Block &train_block, probe_block;
         int mpi_size;
         int maxepoch;
-        size_t pairs_tr;
-        size_t pairs_pr;
-
-        virtual void _sync(std::vector<std::vector<double> > &vec, int num_row, int num_col) {};
     };
 
     class LocalScheduler : Scheduler {
     public:
-        LocalScheduler(pmf_model &model, Block &train_block, int maxepoch, int mpi_size)
-                : Scheduler(model, train_block, train_block, maxepoch, mpi_size) { };
+        LocalScheduler(pmf_model &model, Block &train_block, int maxepoch, int mpi_size) : Scheduler(model, train_block,
+                                                                                                     train_block,
+                                                                                                     maxepoch,
+                                                                                                     mpi_size) {
+            d_D = NewArray(model.num_d, model.num_feat, 0);
+            d_W = NewArray(model.num_w, model.num_feat, 0);
+        };
 
         void run();
 
         void sync();
 
     protected:
+        std::vector<std::vector<double> > d_D, d_W;
+
         void _sync(std::vector<std::vector<double> > vec, int num_row, int num_col);
     };
 
     class GlobalScheduler : Scheduler {
     public:
         GlobalScheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size)
-                : Scheduler(model, train_block, probe_block, maxepoch, mpi_size), epoch(1) { };
+                : Scheduler(model, train_block, probe_block, maxepoch, mpi_size),
+                  epoch(1),
+                  pairs_tr(train_block.size()),
+                  pairs_pr(probe_block.size()) {
+            D_inc = NewArray(model.num_d, model.num_feat, 0);
+            W_inc = NewArray(model.num_w, model.num_feat, 0);
+            d_D = NewArray(model.num_d, model.num_feat, 0);
+            d_W = NewArray(model.num_w, model.num_feat, 0);
+            mean_cnt = sum_cnt(train_vec) / pairs_tr;
+        };
 
         void run();
 
         void sync();
+
+        void update_weight();
 
         void get_train_loss();
 
@@ -109,6 +120,11 @@ namespace pmf {
 
     protected:
         int epoch;
+        size_t pairs_tr;
+        size_t pairs_pr;
+        std::vector<std::vector<double> > D_inc, W_inc;
+        std::vector<std::vector<double> > d_D, d_W;
+        double mean_cnt;
 
         void _sync(std::vector<std::vector<double> > &vec, int num_row, int num_col);
     };
@@ -135,21 +151,6 @@ namespace pmf {
         pmf_model &model;
         double mean_cnt;
         int pairs_tr;
-    };
-
-    // TODO: implement block partition scheduler
-    class BlockGlobalScheduler : Scheduler {
-    public:
-        BlockGlobalScheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size)
-                : Scheduler(model, train_block, probe_block, maxepoch, mpi_size) {};
-
-        void sync();
-    };
-
-    // TODO: implement lock free scheduler
-    class LockFreeLocalScheduler : Scheduler {
-        LockFreeLocalScheduler(pmf_model &model, Block &train_block, int maxepoch, int mpi_size)
-                : Scheduler(model, train_block, train_block, maxepoch, mpi_size) {};
     };
 }
 

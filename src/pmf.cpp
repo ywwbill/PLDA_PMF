@@ -71,7 +71,7 @@ void pmf::GlobalScheduler::run() {
     }
 }
 
-void pmf::Scheduler::update_weight() {
+void pmf::GlobalScheduler::update_weight() {
     cout << "Updating weights" << endl;
 
     //%%%% Update doc and word features %%%%%%%%%%%
@@ -91,30 +91,6 @@ void pmf::Scheduler::update_weight() {
 }
 
 void pmf::GlobalScheduler::sync() {
-    cout << "Sync..." << endl;
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    // Get d_D and d_W of each node
-    _sync(d_D, model.num_d, model.num_feat);
-    _sync(d_W, model.num_w, model.num_feat);
-    cout << "d_D and d_W synced!" << endl;
-
-    // Update D and W using d_D and d_W
-    update_weight();
-
-    // Send new D and W back
-    cout << "Sync D and W" << endl;
-    for (int i = 0; i < model.num_d; ++i) {
-        MPI_Bcast(&model.D[i][0], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    }
-    for (int i = 0; i < model.num_w; ++i) {
-        MPI_Bcast(&model.W[i][0], model.num_feat, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    }
-    cout << "All synced!" << endl;
-}
-
-// TODO:
-void pmf::BlockGlobalScheduler::sync() {
     cout << "Sync..." << endl;
     MPI_Barrier(MPI_COMM_WORLD);
 
