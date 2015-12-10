@@ -66,8 +66,9 @@ void pmf::BlockGlobalScheduler::sync(int epoch) {
     MPI_Barrier(MPI_COMM_WORLD);
     cout << "Sync..." << endl;
 
-    // Get d_W of each node
-    int word_length = (model.num_w - 1) / (mpi_size - 1);
+    // Get d_D and d_W of each node
+    int doc_length = (model.num_d - 1) / (mpi_size - 1) + 1;
+    int word_length = (model.num_w - 1) / (mpi_size - 1) + 1;
 
     for (int i = 1; i <= mpi_size; ++i) {
         int word_begin_idx = ((i + epoch - 2) % mpi_size) * word_length;
@@ -89,7 +90,7 @@ void pmf::BlockGlobalScheduler::sync(int epoch) {
 void pmf::BlockLocalScheduler::sync() {
     MPI_Barrier(MPI_COMM_WORLD);
 
-    int word_length = (model.num_w - 1) / (mpi_size - 1);
+    int word_length = (model.num_w - 1) / (mpi_size - 1) + 1;
     int word_begin_idx = curt_block * word_length;
     int word_begin_idx_next = ((curt_block + 1) % mpi_size) * word_length;
 
