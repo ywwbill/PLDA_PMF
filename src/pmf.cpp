@@ -25,7 +25,7 @@ MPI_Datatype MPI_Triplet;
 
 // Solver
 void pmf::Solver::run(Mat &d_D, Mat &d_W) {
-    int NN = (pairs_tr - 1) / mpi_size + 1; // number training triplets per batch
+    int NN = (pairs_tr - 1) / (mpi_size - 1) + 1; // number training triplets per batch
     vector<double> error(NN, 0), pred_out(NN, 0);
     Mat Ix_D(NN, model.num_feat, 0), Ix_W(NN, model.num_feat, 0); // gradient w.r.t. training sample
     double F = 0.0;
