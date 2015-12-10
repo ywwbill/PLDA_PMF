@@ -17,18 +17,22 @@ namespace pmf {
         double epsilon;
         double lambda;
         double momentum;
-        std::vector<std::vector<double> > &D; // Doc feature vectors
-        std::vector<std::vector<double> > &W; // Word feature vecators
 
-        pmf_model(int num_d, int num_w, int num_feat, std::vector<std::vector<double> > &D,
-                  std::vector<std::vector<double> > &W) : num_d(num_d), num_w(num_w),
-                                                          num_feat(num_feat), D(D), W(W) { }
+        Mat &D; // Doc feature vectors
+        Mat &W; // Word feature vecators
+
+        pmf_model() : num_d(0), num_w(0), num_feat(0), D(*(new Mat(0,0,0))), W(*(new Mat(0,0,0))) { }
+
+        pmf_model(int num_d, int num_w, int num_feat, Mat &D, Mat &W)
+                : num_d(num_d), num_w(num_w), num_feat(num_feat), D(D), W(W) { }
     };
 
 
     class Block {
     public:
         Block(std::vector<Triplet> &vec) : _vec(vec) { current = vec.begin(); };
+
+        Block() : _vec(*(new std::vector<Triplet>())) { current = _vec.begin(); };
 
         bool move_next() { return ++current != _vec.end(); };
 
@@ -48,13 +52,10 @@ namespace pmf {
     public:
         Scheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size)
                 : model(model), train_block(train_block), probe_block(probe_block), mpi_size(mpi_size),
-                  maxepoch(maxepoch) {
+                  maxepoch(maxepoch), d_D(model.num_d, model.num_feat, 0), d_W(model.num_w, model.num_feat, 0),
+                  D_inc(model.num_d, model.num_feat, 0), W_inc(model.num_w, model.num_feat, 0) {
             pairs_tr = train_block.size();
             pairs_pr = probe_block.size();
-            d_D = NewArray(model.num_d, model.num_feat, 0);
-            d_W = NewArray(model.num_w, model.num_feat, 0);
-            D_inc = NewArray(model.num_d, model.num_feat, 0);
-            W_inc = NewArray(model.num_w, model.num_feat, 0);
             mean_cnt = sum_cnt(train_vec) / pairs_tr;
         };
 
@@ -73,8 +74,9 @@ namespace pmf {
         void get_probe_loss();
 
     protected:
-        std::vector<std::vector<double> > d_D, d_W;
-        std::vector<std::vector<double> > D_inc, W_inc;
+        Mat d_D, d_W;
+        Mat D_inc, W_inc;
+
         double mean_cnt;
         pmf_model &model;
         std::vector<Block> blocks;
@@ -84,7 +86,7 @@ namespace pmf {
         size_t pairs_tr;
         size_t pairs_pr;
 
-        virtual void _sync(std::vector<std::vector<double> > &vec, int num_row, int num_col) {};
+        virtual void _sync(Mat &mat, int num_row, int num_col) {};
     };
 
     class LocalScheduler : Scheduler {
@@ -97,7 +99,7 @@ namespace pmf {
         void sync();
 
     protected:
-        void _sync(std::vector<std::vector<double> > vec, int num_row, int num_col);
+        void _sync(Mat &mat, int num_row, int num_col);
     };
 
     class GlobalScheduler : Scheduler {
@@ -112,7 +114,7 @@ namespace pmf {
     protected:
         int epoch;
 
-        void _sync(std::vector<std::vector<double> > &vec, int num_row, int num_col);
+        void _sync(Mat &mat, int num_row, int num_col);
     };
 
 
@@ -124,7 +126,7 @@ namespace pmf {
             mean_cnt = sum_cnt(train_vec) / pairs_tr;
         }
 
-        void run(std::vector<std::vector<double> > &d_D, std::vector<std::vector<double> > &d_W);
+        void run(Mat &d_D, Mat &d_W);
 
         Solver(const Solver &) = delete;
 

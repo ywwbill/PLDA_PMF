@@ -30,7 +30,7 @@ typedef struct Triplet {
     Triplet(int dd, int ww, double cc) : doc_id(dd), word_id(ww), cnt(cc) { }
 } TripletType;
 
-typedef struct Mat{
+typedef struct Mat {
     int n,m;
     double *arr;
     Mat(){}
@@ -48,7 +48,11 @@ typedef struct Mat{
     void set(int i, int j, double v){
         arr[i*m+j] = v;
     }
-};
+
+    int size() {
+        return n * m;
+    }
+} Mat;
 
 bool ParseMainArgs(int argc, char **argv, std::string &train_file, std::string &probe_file);
 

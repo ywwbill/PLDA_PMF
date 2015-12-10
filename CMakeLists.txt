@@ -1,6 +1,8 @@
 cmake_minimum_required (VERSION 2.6)
 project (PLDA_PMF)
 
+set (CMAKE_CXX_STANDARD 11)
+
 find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
