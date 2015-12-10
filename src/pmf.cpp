@@ -253,30 +253,37 @@ int main(int argc, char **argv) {
 
         start_time = MPI_Wtime();
         if (mode == "block") {
-            BlockGlobalScheduler scheduler(model, train_block, probe_block, maxepoch);
+            BlockGlobalScheduler scheduler(model, train_block, probe_block, maxepoch, mpi_size);
             cout << "Running block scheduler" << endl;
             scheduler.run();
         } else {
-            GlobalScheduler scheduler(model, train_block, probe_block, maxepoch);
+            GlobalScheduler scheduler(model, train_block, probe_block, maxepoch, mpi_size);
             cout << "Running scheduler" << endl;
             scheduler.run();
         }
         cout << "Total training time: " << MPI_Wtime() - start_time << endl;
     } else {
         // Local Scheduler
-
-        // Sync train_vec
-        MPI_Bcast(&num_train, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        train_vec.resize(num_train);
-        MPI_Bcast(&train_vec[0], num_train, MPI_Triplet, 0, MPI_COMM_WORLD);
-        Block train_block(train_vec);
-
         if (mode == "block") {
-            BlockLocalScheduler scheduler(model, train_block, maxepoch);
+            // Sync train_vec
+            MPI_Bcast(&num_train, 1, MPI_INT, 0, MPI_COMM_WORLD);
+            train_vec.resize(num_train);
+            MPI_Bcast(&train_vec[0], num_train, MPI_Triplet, 0, MPI_COMM_WORLD);
+
+            Block train_block(train_vec);
+
+            BlockLocalScheduler scheduler(model, train_block, maxepoch, mpi_size, my_rank);
             scheduler.partition();
             scheduler.run();
         } else {
-            LocalScheduler scheduler(model, train_block, maxepoch);
+            // Sync train_vec
+            MPI_Bcast(&num_train, 1, MPI_INT, 0, MPI_COMM_WORLD);
+            train_vec.resize(num_train);
+            MPI_Bcast(&train_vec[0], num_train, MPI_Triplet, 0, MPI_COMM_WORLD);
+
+            Block train_block(train_vec);
+
+            LocalScheduler scheduler(model, train_block, maxepoch, mpi_size);
             scheduler.run();
         }
     }
