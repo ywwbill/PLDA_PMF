@@ -12,8 +12,8 @@ namespace pmf {
     // TODO: implement block partition scheduler
     class BlockGlobalScheduler : Scheduler {
     public:
-        BlockGlobalScheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size)
-                : Scheduler(model, train_block, probe_block, maxepoch, mpi_size) { };
+        BlockGlobalScheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch)
+                : Scheduler(model, train_block, probe_block, maxepoch) { };
 
         void run();
 
@@ -27,9 +27,9 @@ namespace pmf {
 
     class BlockLocalScheduler : Scheduler {
     public:
-        BlockLocalScheduler(pmf_model &model, Block &train_block, int maxepoch, int mpi_size, int my_rank)
-                : Scheduler(model, train_block, train_block, maxepoch, mpi_size) {
-            int NN = (model.num_d - 1) / (mpi_size - 1) + 1;
+        BlockLocalScheduler(pmf_model &model, Block &train_block, int maxepoch)
+                : Scheduler(model, train_block, train_block, maxepoch) {
+            int NN = (model.num_d - 1) / (mpi_size - 1);
             doc_begin_idx = (my_rank - 1) * NN;
             doc_end_idx = std::min(my_rank * NN - 1, model.num_d - 1);
             curt_block = my_rank - 1;
@@ -64,8 +64,8 @@ namespace pmf {
 
     // TODO: implement lock free scheduler
     class LockFreeLocalScheduler : Scheduler {
-        LockFreeLocalScheduler(pmf_model &model, Block &train_block, int maxepoch, int mpi_size)
-                : Scheduler(model, train_block, train_block, maxepoch, mpi_size) { };
+        LockFreeLocalScheduler(pmf_model &model, Block &train_block, int maxepoch)
+                : Scheduler(model, train_block, train_block, maxepoch) { };
     };
 
 };

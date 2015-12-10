@@ -11,6 +11,7 @@
 #include "mf.h"
 
 extern MPI_Status status;
+extern int mpi_size, my_rank;
 
 namespace pmf {
 
@@ -34,9 +35,9 @@ namespace pmf {
 
     class Block {
     public:
-        Block(std::vector<Triplet> &vec) : _vec(vec) { current = vec.begin(); };
+        Block(std::vector<Triplet> vec) : _vec(vec) { current = vec.begin(); };
 
-        Block() : _vec(*(new std::vector<Triplet>())) { current = _vec.begin(); };
+        Block() { current = _vec.begin(); };
 
         bool move_next() { return ++current != _vec.end(); };
 
@@ -47,16 +48,16 @@ namespace pmf {
         void append(Triplet triplet) { _vec.push_back(triplet); };
 
     private:
-        std::vector<Triplet> &_vec;
+        std::vector<Triplet> _vec;
         std::vector<Triplet>::iterator current;
     };
 
 
     class Scheduler {
     public:
-        Scheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size)
-                : model(model), train_block(train_block), probe_block(probe_block), mpi_size(mpi_size),
-                  maxepoch(maxepoch), d_D(model.num_d, model.num_feat, 0), d_W(model.num_w, model.num_feat, 0),
+        Scheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch)
+                : model(model), train_block(train_block), probe_block(probe_block), maxepoch(maxepoch),
+                  d_D(model.num_d, model.num_feat, 0), d_W(model.num_w, model.num_feat, 0),
                   D_inc(model.num_d, model.num_feat, 0), W_inc(model.num_w, model.num_feat, 0) {
             pairs_tr = train_block.size();
             pairs_pr = probe_block.size();
@@ -95,8 +96,8 @@ namespace pmf {
 
     class LocalScheduler : Scheduler {
     public:
-        LocalScheduler(pmf_model &model, Block &train_block, int maxepoch, int mpi_size)
-                : Scheduler(model, train_block, train_block, maxepoch, mpi_size) { };
+        LocalScheduler(pmf_model &model, Block &train_block, int maxepoch)
+                : Scheduler(model, train_block, train_block, maxepoch) { };
 
         void run();
 
@@ -108,8 +109,8 @@ namespace pmf {
 
     class GlobalScheduler : Scheduler {
     public:
-        GlobalScheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size)
-                : Scheduler(model, train_block, probe_block, maxepoch, mpi_size), epoch(1) { };
+        GlobalScheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch)
+                : Scheduler(model, train_block, probe_block, maxepoch), epoch(1) { };
 
         void run();
 
