@@ -77,6 +77,8 @@ void Add(Mat &res, const Mat & rhs);
 
 double SqrSum(const std::vector<double> &arr);
 
+template<typename Type> Type sqr(Type x);
+
 extern std::vector<Triplet> train_vec, probe_vec;
 extern std::vector<double> err_train, err_valid;
 
