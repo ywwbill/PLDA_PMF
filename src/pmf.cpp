@@ -147,9 +147,9 @@ void pmf::LocalScheduler::run() {
     }
 }
 
-void pmf::LocalScheduler::_sync(Mat &mat, int num_row, int num_col) {
-    double *rows = new double[mat.size() * mpi_size];
-    MPI_Gather(mat.arr, mat.size(), MPI_DOUBLE, rows, mat.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+void pmf::LocalScheduler::_sync(Mat &vec, int num_row, int num_col) {
+    double *rows = nullptr;
+    MPI_Gather(vec.arr, vec.size(), MPI_DOUBLE, rows, num_col, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
 void pmf::LocalScheduler::sync() {
