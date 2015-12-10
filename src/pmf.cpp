@@ -100,15 +100,15 @@ void pmf::GlobalScheduler::sync() {
 
     // Send new D and W back
     cout << "Sync D and W" << endl;
-    MPI_Bcast(&model.D.arr, model.D.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&model.W.arr, model.W.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(model.D.arr, model.D.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(model.W.arr, model.W.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
     cout << "All synced!" << endl;
 }
 
 void pmf::GlobalScheduler::_sync(Mat &mat, int num_row, int num_col) {
     double *mats = new double[mat.size() * mpi_size];
 
-    MPI_Gather(&mat.arr, mat.size(), MPI_DOUBLE, mats, mat.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(mat.arr, mat.size(), MPI_DOUBLE, mats, mat.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     for (int i = 0; i < num_row; ++i) {
         for (int j = 0; j < num_col; ++j) {
@@ -147,21 +147,21 @@ void pmf::LocalScheduler::run() {
     }
 }
 
-void pmf::LocalScheduler::_sync(Mat &mat) {
+void pmf::LocalScheduler::_sync(Mat &mat, int num_row, int num_col) {
     double *rows = new double[mat.size() * mpi_size];
-    MPI_Gather(&mat.arr, mat.size(), MPI_DOUBLE, rows, mat.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(mat.arr, mat.size(), MPI_DOUBLE, rows, mat.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
 void pmf::LocalScheduler::sync() {
     MPI_Barrier(MPI_COMM_WORLD);
 
     // Send d_D and d_W to master node
-    _sync(d_D);
-    _sync(d_W);
+    _sync(d_D, model.num_d, model.num_feat);
+    _sync(d_W, model.num_w, model.num_feat);
 
     // Get new D and W
-    MPI_Bcast(&model.D.arr, model.D.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&model.W.arr, model.W.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(model.D.arr, model.D.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(model.W.arr, model.W.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
 Mat D, W;
@@ -267,7 +267,7 @@ int main(int argc, char **argv) {
 
         // Sync train_vec
         MPI_Bcast(&num_train, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        train_vec.reserve(num_train);
+        train_vec.resize(num_train);
         MPI_Bcast(&train_vec[0], num_train, MPI_Triplet, 0, MPI_COMM_WORLD);
         Block train_block(train_vec);
 

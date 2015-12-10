@@ -104,7 +104,7 @@ namespace pmf {
         void sync();
 
     protected:
-        void _sync(Mat &mat);
+        void _sync(Mat &mat, int num_row, int num_col);
     };
 
     class GlobalScheduler : Scheduler {
