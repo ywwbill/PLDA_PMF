@@ -63,36 +63,35 @@ void pmf::BlockGlobalScheduler::update_weight() {
 }
 
 void pmf::BlockGlobalScheduler::sync(int epoch) {
-    MPI_Barrier(MPI_COMM_WORLD);
     cout << "Sync..." << endl;
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // Get d_D and d_W of each node
     int doc_length = (model.num_d - 1) / (mpi_size - 1) + 1;
     int word_length = (model.num_w - 1) / (mpi_size - 1) + 1;
 
     for (int i = 1; i <= mpi_size; ++i) {
-        int word_begin_idx = ((i + epoch - 2) % mpi_size) * word_length;
+        int word_begin_idx = ((i - 1 + epoch) % mpi_size) * (word_length / (mpi_size - 1));
         MPI_Recv(d_W.arr + word_begin_idx * model.num_feat, word_length * model.num_feat, MPI_DOUBLE, i, 99, MPI_COMM_WORLD, &status);
     }
-    cout << "d_W synced!" << endl;
+    cout << "d_D and d_W synced!" << endl;
 
     // Update W using d_W
     update_weight();
 
     // Send new part of W back
     for (int i = 1; i <= mpi_size; ++i) {
-        int word_begin_idx = ((i + epoch - 1) % mpi_size) * word_length;
+        int word_begin_idx = ((i + epoch) % mpi_size) * (word_length / (mpi_size - 1));
         MPI_Send(model.W.arr + word_begin_idx * model.num_feat, word_length * model.num_feat, MPI_DOUBLE, i, 99, MPI_COMM_WORLD);
     }
     cout << "All synced!" << endl;
 }
 
 void pmf::BlockLocalScheduler::sync() {
-    MPI_Barrier(MPI_COMM_WORLD);
-
+    int doc_length = (model.num_d - 1) / (mpi_size - 1) + 1;
     int word_length = (model.num_w - 1) / (mpi_size - 1) + 1;
-    int word_begin_idx = curt_block * word_length;
-    int word_begin_idx_next = ((curt_block + 1) % mpi_size) * word_length;
+    int word_begin_idx = curt_block * (word_length / (mpi_size - 1));
+    int word_begin_idx_next = ((curt_block + 1) % mpi_size ) * (word_length / (mpi_size - 1));
 
     MPI_Send(d_W.arr + word_begin_idx * model.num_feat, word_length * model.num_feat, MPI_DOUBLE, 0, 99, MPI_COMM_WORLD);
     MPI_Recv(model.W.arr + word_begin_idx_next * model.num_feat, word_length * model.num_feat, MPI_DOUBLE, 0, 99, MPI_COMM_WORLD, &status);
