@@ -7,7 +7,7 @@ find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
 add_executable(mf src/mf.cpp src/mf.h src/mf_common.cpp)
-add_executable(pmf src/pmf.cpp src/pmf.h src/mf.h src/mf_common.cpp)
+add_executable(pmf src/pmf.cpp src/pmf.h src/mf.h src/mf_common.cpp src/pmf_block.cpp src/pmf_block.h)
 
 target_link_libraries(pmf ${MPI_LIBRARIES})
 
