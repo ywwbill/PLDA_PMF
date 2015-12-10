@@ -6,8 +6,6 @@
 #define PLDA_PMF_PMF_H
 
 #include <string>
-#include <mpi.h>
-
 #include "mf.h"
 
 extern MPI_Status status;

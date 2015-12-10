@@ -15,10 +15,10 @@ void pmf::BlockSolver::run(Block &block, Mat &d_D, Mat &d_W, int curt_block) {
     vector<double> error(NN, 0), pred_out(NN, 0);
     Mat Ix_D(NN, model.num_feat, 0), Ix_W(NN, model.num_feat, 0); // gradient w.r.t. training sample
     double F = 0.0;
-    int begin_idx = 0, end_idx = block.size() - 1;
+    int begin_idx = 0, end_idx = block.size();
 
     //%%%%%%%%%%%%%% Compute Predictions %%%%%%%%%%%%%%%%%
-    F = CalcObj(model.D, model.W, train_vec, begin_idx, end_idx, model.lambda, mean_cnt, error, pred_out);
+    F = CalcObj(model.D, model.W, train_vec, 0, block.size(), model.lambda, mean_cnt, error, pred_out);
 
     //%%%%%%%%%%%%%% Compute Gradients %%%%%%%%%%%%%%%%%%%
     for (int i = begin_idx; i <= end_idx; i++) {
