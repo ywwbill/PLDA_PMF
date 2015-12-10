@@ -162,10 +162,3 @@ bool ParseMainArgs(int argc, char **argv, string &train_file, string &probe_file
     probe_file = string(argv[2]);
     return true;
 }
-
-bool ParseMainArgs(int argc, char **argv, string &train_file, string &probe_file, string &mode) {
-    if (!ParseMainArgs(argc, argv, train_file, probe_file))
-        return false;
-    mode = string(argv[3]);
-    return true;
-}

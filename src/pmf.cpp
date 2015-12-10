@@ -13,7 +13,7 @@
 #include <stddef.h>
 
 #include "pmf.h"
-#include "pmf_block.h"
+#include "mf.h"
 
 using namespace std;
 using namespace pmf;
@@ -29,7 +29,7 @@ void pmf::Solver::run(Mat &d_D, Mat &d_W) {
     vector<double> error(NN, 0), pred_out(NN, 0);
     Mat Ix_D(NN, model.num_feat, 0), Ix_W(NN, model.num_feat, 0); // gradient w.r.t. training sample
     double F = 0.0;
-    int begin_idx = (my_rank - 1) * NN, end_idx = min(my_rank * NN - 1, pairs_tr - 1);
+    int begin_idx = (my_rank - 1) * NN, end_idx = min(my_rank * NN - 1, pairs_tr - 1), N = end_idx - begin_idx + 1;
 
     //%%%%%%%%%%%%%% Compute Predictions %%%%%%%%%%%%%%%%%
     F = CalcObj(model.D, model.W, train_vec, begin_idx, end_idx, model.lambda, mean_cnt, error, pred_out);
@@ -84,6 +84,7 @@ void pmf::Scheduler::update_weight() {
     //W_inc = W_inc*momentum + d_W*(epsilon/N);
     Minus(model.W, W_inc);
     //W =  W - W_inc;
+
 }
 
 void pmf::GlobalScheduler::sync() {
@@ -102,6 +103,46 @@ void pmf::GlobalScheduler::sync() {
     cout << "Sync D and W" << endl;
     MPI_Bcast(model.D.arr, model.D.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(model.W.arr, model.W.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    cout << "All synced!" << endl;
+}
+
+void pmf::BlockGlobalScheduler::run() {
+    // TODO: partition
+    vector<vector<Block>> blocks(mpi_size - 1, vector<Block>(mpi_size - 1));
+
+    for (int i = 0; i < train_vec.size(); ++i) {
+        int doc_id = train_vec[i].doc_id, word_id = train_vec[i].word_id;
+        blocks[doc_id / mpi_size][word_id / mpi_size].append(train_vec[i]);
+    }
+
+    for (int epoch = 1; epoch <= maxepoch; ++epoch) {
+        sync();
+
+        get_train_loss();
+        get_probe_loss();
+
+        printf("epoch %4i Training RMSE %6.4f  Test RMSE %6.4f  \n", epoch, err_train.back(), err_valid.back());
+    }
+}
+
+
+// TODO: partition by blocks
+void pmf::BlockGlobalScheduler::sync() {
+    cout << "Sync..." << endl;
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // Get d_D and d_W of each node
+    _sync(d_D, model.num_d, model.num_feat);
+    _sync(d_W, model.num_w, model.num_feat);
+    cout << "d_D and d_W synced!" << endl;
+
+    // Update D and W using d_D and d_W
+    update_weight();
+
+    // Send new D and W back
+    cout << "Sync D and W" << endl;
+    MPI_Bcast(&model.D, model.D.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&model.W, model.W.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
     cout << "All synced!" << endl;
 }
 
@@ -147,6 +188,19 @@ void pmf::LocalScheduler::run() {
     }
 }
 
+// TODO: rotate blocks
+void pmf::BlockLocalScheduler::run() {
+    Solver solver(*this, train_block, model);
+
+    for (int epoch = 1; epoch <= maxepoch; ++epoch) {
+        // run Solver
+        solver.run(d_D, d_W);
+
+        // Sync parameters
+        sync();
+    }
+}
+
 void pmf::LocalScheduler::_sync(Mat &vec, int num_row, int num_col) {
     double *rows = nullptr;
     MPI_Gather(vec.arr, vec.size(), MPI_DOUBLE, rows, num_col, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -166,7 +220,6 @@ void pmf::LocalScheduler::sync() {
 
 Mat D, W;
 
-// Initilize MF model
 pmf_model init_mode() {
     int num_d = 2020; // Number of docs
     int num_w = 7167; // Number of words
@@ -182,7 +235,6 @@ pmf_model init_mode() {
     return model;
 }
 
-// Create MPI Datatype for Triplet
 void create_triplet_type() {
     const int num_elem = 3;
     int block_lengths[num_elem] = {1, 1, 1};
@@ -201,9 +253,8 @@ void create_triplet_type() {
 int main(int argc, char **argv) {
     string train_file = "";
     string probe_file = "";
-    string mode = "block";
 
-    if (!ParseMainArgs(argc, argv, train_file, probe_file, mode)) return 0;
+    if (!ParseMainArgs(argc, argv, train_file, probe_file)) return 0;
 
     int maxepoch = 50;
     pmf_model model = init_mode();
@@ -252,40 +303,22 @@ int main(int argc, char **argv) {
         Block probe_block(probe_vec);
 
         start_time = MPI_Wtime();
-        if (mode == "block") {
-            BlockGlobalScheduler scheduler(model, train_block, probe_block, maxepoch, mpi_size);
-            cout << "Running block scheduler" << endl;
-            scheduler.run();
-        } else {
-            GlobalScheduler scheduler(model, train_block, probe_block, maxepoch, mpi_size);
-            cout << "Running scheduler" << endl;
-            scheduler.run();
-        }
+        GlobalScheduler scheduler(model, train_block, probe_block, maxepoch, mpi_size);
+        cout << "Running scheduler" << endl;
+        scheduler.run();
         cout << "Total training time: " << MPI_Wtime() - start_time << endl;
     } else {
         // Local Scheduler
-        if (mode == "block") {
-            // Sync train_vec
-            MPI_Bcast(&num_train, 1, MPI_INT, 0, MPI_COMM_WORLD);
-            train_vec.resize(num_train);
-            MPI_Bcast(&train_vec[0], num_train, MPI_Triplet, 0, MPI_COMM_WORLD);
 
-            Block train_block(train_vec);
+        // Sync train_vec
+        MPI_Bcast(&num_train, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        train_vec.resize(num_train);
+        MPI_Bcast(&train_vec[0], num_train, MPI_Triplet, 0, MPI_COMM_WORLD);
 
-            BlockLocalScheduler scheduler(model, train_block, maxepoch, mpi_size, my_rank);
-            scheduler.partition();
-            scheduler.run();
-        } else {
-            // Sync train_vec
-            MPI_Bcast(&num_train, 1, MPI_INT, 0, MPI_COMM_WORLD);
-            train_vec.resize(num_train);
-            MPI_Bcast(&train_vec[0], num_train, MPI_Triplet, 0, MPI_COMM_WORLD);
+        Block train_block(train_vec);
 
-            Block train_block(train_vec);
-
-            LocalScheduler scheduler(model, train_block, maxepoch, mpi_size);
-            scheduler.run();
-        }
+        LocalScheduler scheduler(model, train_block, maxepoch, mpi_size);
+        scheduler.run();
     }
 
     MPI_Finalize();

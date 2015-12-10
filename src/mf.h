@@ -56,11 +56,11 @@ typedef struct Mat {
 
 bool ParseMainArgs(int argc, char **argv, std::string &train_file, std::string &probe_file);
 
-bool ParseMainArgs(int argc, char **argv, std::string &train_file, std::string &probe_file, std::string &mode);
-
 void load_data(std::string data_file, std::vector<Triplet> &data_vec, int &num_d, int &num_w, int &cur_doc_id);
 
 double sum_cnt(std::vector<Triplet> &data_vec);
+
+std::vector<std::vector<double> > NewArray(int n, int m, int default_val);
 
 double CalcObj(const Mat &D, const Mat &W,
                const std::vector<Triplet> &train_vec, const int &begin_idx, const int &end_idx, const double &lambda,

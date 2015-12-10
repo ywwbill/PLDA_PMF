@@ -8,8 +8,6 @@
 #include <string>
 #include "mf.h"
 
-extern MPI_Status status;
-
 namespace pmf {
 
     struct pmf_model {
@@ -137,11 +135,41 @@ namespace pmf {
     protected:
         Scheduler &scheduler;
         Block &block;
+        int maxepoch;
         pmf_model &model;
         double mean_cnt;
         int pairs_tr;
     };
 
+    // TODO: implement block partition scheduler
+    class BlockGlobalScheduler : Scheduler {
+    public:
+        BlockGlobalScheduler(pmf_model &model, Block &train_block, Block &probe_block, int maxepoch, int mpi_size)
+                : Scheduler(model, train_block, probe_block, maxepoch, mpi_size) {};
+
+        void run();
+
+        void sync();
+    };
+
+    class BlockLocalScheduler : Scheduler {
+    public:
+        BlockLocalScheduler(pmf_model &model, Block &train_block, int maxepoch, int mpi_size)
+                : Scheduler(model, train_block, train_block, maxepoch, mpi_size) {};
+
+        void run();
+
+        void sync();
+
+    protected:
+        int epoch;
+    };
+
+    // TODO: implement lock free scheduler
+    class LockFreeLocalScheduler : Scheduler {
+        LockFreeLocalScheduler(pmf_model &model, Block &train_block, int maxepoch, int mpi_size)
+                : Scheduler(model, train_block, train_block, maxepoch, mpi_size) {};
+    };
 }
 
 #endif //PLDA_PMF_PMF_H
